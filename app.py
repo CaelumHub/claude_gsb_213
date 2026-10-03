@@ -327,8 +327,11 @@ def _apply_edit(src_path: str, dst_path: str, op: str, params: Dict) -> None:
         end_f = max(start_f, min(end_f, total))
 
         gain = 10.0 ** (float(params.get("gain_db", 0)) / 20.0)
-        fade_in = float(params.get("fade_in", 0)) * sr
-        fade_out = float(params.get("fade_out", 0)) * sr
+        # Fade lengths in samples, clamped to the selection so the two ramps
+        # can never reach outside [start_f, end_f).
+        region_f = end_f - start_f
+        fade_in = min(float(params.get("fade_in", 0)) * sr, region_f)
+        fade_out = min(float(params.get("fade_out", 0)) * sr, region_f)
 
         # Normalise needs a peak pre-scan.
         if op == "normalize":
@@ -365,10 +368,13 @@ def _apply_edit(src_path: str, dst_path: str, op: str, params: Dict) -> None:
                             if start_f <= gpos < end_f:
                                 x = 0.0
                         if op == "fade":
-                            if fade_in > 0 and gpos < fade_in:
-                                x *= gpos / fade_in
-                            if fade_out > 0 and gpos >= total - fade_out:
-                                x *= (total - gpos) / fade_out
+                            # Fade-in ramps up from the selection start,
+                            # fade-out ramps down to the selection end;
+                            # samples outside the selection stay untouched.
+                            if fade_in > 0 and start_f <= gpos < start_f + fade_in:
+                                x *= (gpos - start_f) / fade_in
+                            if fade_out > 0 and end_f - fade_out <= gpos < end_f:
+                                x *= (end_f - gpos) / fade_out
                         o.append(x)
                     out.append(o)
                 w.write_chunk(out)
