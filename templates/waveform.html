@@ -146,7 +146,11 @@ $("#opTrim").onclick = () => { const s = selectionParams(); if (!s) return toast
 $("#opSilence").onclick = () => { const s = selectionParams(); if (!s) return toast("请先拖拽选择区域", "warn"); applyEdit("silence", s); };
 $("#opNormalize").onclick = () => applyEdit("normalize", { peak: 0.99 });
 $("#opReverse").onclick = () => applyEdit("reverse", {});
-$("#opFade").onclick = () => applyEdit("fade", { fade_in: +$("#fadeIn").value, fade_out: +$("#fadeOut").value });
+$("#opFade").onclick = () => {
+  const s = selectionParams();
+  if (!s) return toast("请先拖拽选择区域", "warn");
+  applyEdit("fade", { ...s, fade_in: +$("#fadeIn").value, fade_out: +$("#fadeOut").value });
+};
 $("#opGain").onclick = () => applyEdit("gain", { gain_db: +$("#gainDb").value });
 $("#loadBtn").onclick = loadWave;
 

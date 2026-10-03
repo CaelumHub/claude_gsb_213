@@ -327,8 +327,12 @@ def _apply_edit(src_path: str, dst_path: str, op: str, params: Dict) -> None:
         end_f = max(start_f, min(end_f, total))
 
         gain = 10.0 ** (float(params.get("gain_db", 0)) / 20.0)
-        fade_in = float(params.get("fade_in", 0)) * sr
-        fade_out = float(params.get("fade_out", 0)) * sr
+        region = start_f < end_f
+        sel_len = end_f - start_f
+        # Fades are anchored to the selection; clamp each fade to the region
+        # length so they cannot spill past its opposite boundary.
+        fade_in = min(float(params.get("fade_in", 0)) * sr, sel_len) if region else 0.0
+        fade_out = min(float(params.get("fade_out", 0)) * sr, sel_len) if region else 0.0
 
         # Normalise needs a peak pre-scan.
         if op == "normalize":
@@ -365,10 +369,12 @@ def _apply_edit(src_path: str, dst_path: str, op: str, params: Dict) -> None:
                             if start_f <= gpos < end_f:
                                 x = 0.0
                         if op == "fade":
-                            if fade_in > 0 and gpos < fade_in:
-                                x *= gpos / fade_in
-                            if fade_out > 0 and gpos >= total - fade_out:
-                                x *= (total - gpos) / fade_out
+                            if start_f <= gpos < end_f:
+                                rel = gpos - start_f
+                                if fade_in > 0 and rel < fade_in:
+                                    x *= rel / fade_in
+                                if fade_out > 0 and rel >= sel_len - fade_out:
+                                    x *= (sel_len - rel) / fade_out
                         o.append(x)
                     out.append(o)
                 w.write_chunk(out)
